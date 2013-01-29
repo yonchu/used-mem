@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# Print memory status.
+#
+#  Usage:
+#    $ used-mem
+#      => 77.8%(6.2G/8.0G)
+#
+#    $ used-mem '#f%(#FG/#TG)'
+#      => 22.2%(1.8G/8.0G)
+#
+#  Format string:
+#    #f : Free memory(%).
+#    #u : Used memory(%).
+#    #F : Free memory(GB).
+#    #U : Used memory(GB).
+#    #T : Total memory(GB).
+#
+#  About vm_stat:
+#    Page size: 4096 bytes
+#    http://qz.tsugumi.org/man_vm_stat.html
+#    http://d.hatena.ne.jp/zariganitosh/20110617/free_memory
+#    https://discussionsjapan.apple.com/thread/10093439?start=0&tstart=0
+#    http://support.apple.com/kb/HT1342?viewlocale=ja_JP&locale=ja_JP
+
+if [ -z "$1" ]; then
+    FORMAT='#u%(#UG/#TG)'
+else
+    FORMAT=$1
+fi
+
+round_off() {
+    local num=$1
+    local end_num=$(echo "$num" | sed 's/^.*\(.\)$/\1/')
+    num=$(($num / 10))
+    if [ $end_num -ge 5 ]; then
+        num=$(($num + 1))
+    fi
+    echo "$num" | sed -e 's/\(.*\)\([0-9]\)/\1.\2/' -e 's/^\./0./'
+}
+
+# Calculate $1/$2(%) to first decimal place.
+calculate_percent() {
+    round_off $(($1 * 10000 / $2))
+}
+
+# Convert $1 KB to GB.
+convert_kb_to_gb() {
+    round_off $(($1 * 100 / 1024 / 1024))
+}
+
+# Calculate used memory(KB) and total memory(KB).
+calculate_memory() {
+    local free_mem
+    local used_mem
+
+    if type vm_stat > /dev/null 2>&1; then
+        local vm_stat
+        vm_stat=$(vm_stat)
+        local pages_free=$(echo "$vm_stat" | awk '/Pages free/ {print $3}' | tr -d '.')
+        local pages_active=$(echo "$vm_stat" | awk '/Pages active/ {print $3}' | tr -d '.')
+        local pages_inactive=$(echo "$vm_stat" | awk '/Pages inactive/ {print $3}' | tr -d '.')
+        local pages_speculative=$(echo "$vm_stat" | awk '/Pages speculative/ {print $3}' | tr -d '.')
+        local pages_wired=$(echo "$vm_stat" | awk '/Pages wired down/ {print $4}' | tr -d '.')
+
+        local free_mem=$((($pages_free + $pages_speculative) * 4096 / 1024))
+        local used_mem=$((($pages_active + $pages_inactive + $pages_wired) * 4096 / 1024))
+        # Actual memory excluded inactive one.
+        #local used_mem=$(($pages_active + $pages_wired))
+
+        if [ -n "$DEBUG" ]; then
+            {
+                echo "Page size: 4096bytes"
+                echo "pages_free: $pages_free pages"
+                echo "pages_active: $pages_active pages"
+                echo "pages_inactive: $pages_Inactive pages"
+                echo "pages_speculative: $pages_speculative pages"
+                echo "pages_wired: $pages_wired pages"
+                echo
+                echo "pages_free: $(($pages_free * 4096 / 1024)) KB"
+                echo "pages_active: $(($pages_active * 4096 / 1024)) KB"
+                echo "pages_inactive: $(($pages_inactive * 4096 / 1024)) KB"
+                echo "pages_speculative: $(($pages_speculative * 4096 / 1024)) KB"
+                echo "pages_wired: $(($pages_wired * 4096 / 1024)) KB"
+                echo
+            } 1>&2
+        fi
+    elif type free > /dev/null 2>&1; then
+        local free
+        free=$(free)
+        free_mem=$(echo "$free" | awk '/-\/\+ buffers\/cache/ {print $4}')
+        used_mem=$(echo "$free" | awk '/-\/\+ buffers\/cache/ {print $3}')
+    else
+        return 1
+    fi
+
+    local total_mem=$(($used_mem + $free_mem))
+
+    if [ -n "$DEBUG" ]; then
+        {
+            echo "free_mem: $(($free_mem / 1024)) MB"
+            echo "used_mem: $(($used_mem / 1024)) MB"
+            echo "total_mem: $(($total_mem / 1024)) MB"
+            echo
+        } 1>&2
+    fi
+
+    echo "$free_mem" "$used_mem" "$total_mem"
+}
+
+# Main
+main() {
+    local -a mem
+    mem=($(calculate_memory)) || return 1
+
+    local free_mem=${mem[0]}
+    local used_mem=${mem[1]}
+    local total_mem=${mem[2]}
+
+    local used_mem_gb=$(convert_kb_to_gb "$used_mem") || return 1
+    local free_mem_gb=$(convert_kb_to_gb "$free_mem") || return 1
+    local total_mem_gb=$(convert_kb_to_gb "$total_mem") || return 1
+
+    local used_mem_percent=$(calculate_percent "$used_mem" "$total_mem") || return 1
+    local free_mem_percent=$(calculate_percent "$free_mem" "$total_mem") || return 1
+
+    if [ -n "$DEBUG" ]; then
+        {
+            echo "used_mem_gb: ${used_mem_gb}GB"
+            echo "free_mem_gb: ${free_mem_gb}GB"
+            echo "total_mem_gb: ${total_mem_gb}GB"
+            echo "used_mem_percent: ${used_mem_percent}%"
+            echo "free_mem_percent: ${free_mem_percent}%"
+            echo
+        } 1>&2
+    fi
+    echo "$FORMAT" | sed \
+        -e "s/#u/$used_mem_percent/g" \
+        -e "s/#f/$free_mem_percent/g" \
+        -e "s/#U/$used_mem_gb/g" \
+        -e "s/#F/$free_mem_gb/g" \
+        -e "s/#T/$total_mem_gb/g"
+}
+
+main
+
