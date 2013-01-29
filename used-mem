@@ -30,12 +30,7 @@ else
 fi
 
 round_off() {
-    local num=$1
-    local end_num=$(echo "$num" | sed 's/^.*\(.\)$/\1/')
-    num=$(($num / 10))
-    if [ $end_num -ge 5 ]; then
-        num=$(($num + 1))
-    fi
+    local num=$((($1 + 5) / 10))
     echo "$num" | sed -e 's/\(.*\)\([0-9]\)/\1.\2/' -e 's/^\./0./'
 }
 
