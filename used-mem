@@ -29,19 +29,19 @@ else
     FORMAT=$1
 fi
 
-round_off() {
-    local num=$((($1 + 5) / 10))
-    echo "$num" | sed -e 's/\(.*\)\([0-9]\)/\1.\2/' -e 's/^\./0./'
-}
-
-# Calculate $1/$2(%) to first decimal place.
+# Calculate $1/$2(%) to $3 decimal place.
 calculate_percent() {
-    round_off $(($1 * 10000 / $2))
+    local scale=$3
+    local num=$(echo "scale=9; $1 / $2" | bc)
+    num=$(echo "$num * 100" | bc)
+    printf "%${3}f" $num
 }
 
-# Convert $1 KB to GB.
+# Convert $1 KB to GB ($2 decimal place).
 convert_kb_to_gb() {
-    round_off $(($1 * 100 / 1024 / 1024))
+    local scale=$2
+    local num=$(echo "scale=9; $1 / 1024 / 1024" | bc)
+    printf "%${2}f" $num
 }
 
 # Calculate used memory(KB) and total memory(KB).
@@ -112,12 +112,12 @@ main() {
     local used_mem=${mem[1]}
     local total_mem=${mem[2]}
 
-    local used_mem_gb=$(convert_kb_to_gb "$used_mem") || return 1
-    local free_mem_gb=$(convert_kb_to_gb "$free_mem") || return 1
-    local total_mem_gb=$(convert_kb_to_gb "$total_mem") || return 1
+    local used_mem_gb=$(convert_kb_to_gb "$used_mem" '.1') || return 1
+    local free_mem_gb=$(convert_kb_to_gb "$free_mem" '.1') || return 1
+    local total_mem_gb=$(convert_kb_to_gb "$total_mem" '.1') || return 1
 
-    local used_mem_percent=$(calculate_percent "$used_mem" "$total_mem") || return 1
-    local free_mem_percent=$(calculate_percent "$free_mem" "$total_mem") || return 1
+    local used_mem_percent=$(calculate_percent "$used_mem" "$total_mem" '.1') || return 1
+    local free_mem_percent=$(calculate_percent "$free_mem" "$total_mem" '.1') || return 1
 
     if [ -n "$DEBUG" ]; then
         {
