@@ -104,11 +104,12 @@ calculate_memory() {
         {
             echo "free_mem: $(($free_mem / 1024)) MB"
             echo "used_mem: $(($used_mem / 1024)) MB"
+            echo "free_mem(%): $(calculate_percent "$free_mem" "$total_mem" '.3')%"
+            echo "used_mem(%): $(calculate_percent "$used_mem" "$total_mem" '.3')%"
             echo "total_mem: $(($total_mem / 1024)) MB"
             echo
         } 1>&2
     fi
-
     # Caching data.
     FREE_MEM=$free_mem
     USED_MEM=$used_mem
@@ -122,6 +123,14 @@ set_up_format() {
     local -a list
     list=($(echo "$format" | GREP_OPTIONS= grep -o "#[^#${sigil}]*${sigil}"))
 
+    if [ -n "$DEBUG" ]; then
+        {
+            echo "sigil=$sigil"
+            echo "format=$format"
+            echo "list=${list[@]}"
+        } 1>&2
+    fi
+
     local item
     local scale
     local num
@@ -129,6 +138,12 @@ set_up_format() {
         scale=$(echo "$item" | sed 's/^#\(.*\).$/\1/')
         if [ -z "$scale" ]; then
             scale=$DEFAULT_SCALE
+        fi
+        if [ -n "$DEBUG" ]; then
+            {
+                echo "item=$item"
+                echo "scale=$scale"
+            } 1>&2
         fi
         case $sigil in
             f)
@@ -153,6 +168,14 @@ set_up_format() {
         esac
         item=$(echo "$item" | sed 's/\./\\./')
         format=$(echo "$format" | sed "s/$item/$num/g")
+
+        if [ -n "$DEBUG" ]; then
+            {
+                echo "num=$num" 1>&2
+                echo "item=$item" 1>&2
+                echo "format=$format" 1>&2
+            } 1>&2
+        fi
     done
     echo "$format"
 }
@@ -168,6 +191,16 @@ main() {
     done
 
     echo "$format"
+
+    if [ -n "$DEBUG" ]; then
+        echo '========== ========== ========== =========' 1>&2
+        local debug_format='Free: #.2f % (#.3F GB) | Used: #.2u % (#.3U GB) | Total: #.3T GB'
+        for sigil in f u F U T; do
+            debug_format=$(set_up_format "$sigil" "$debug_format") || return 1
+        done
+        echo "$debug_format" 1>&2
+        echo '========== ========== ========== =========' 1>&2
+    fi
 }
 
 main
