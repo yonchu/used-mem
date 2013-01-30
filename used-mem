@@ -168,12 +168,21 @@ set_up_format() {
         if [ -z "$scale" ]; then
             scale=$DEFAULT_SCALE
         fi
+
+        # Check scale.
+        if [ $(echo "$scale" | sed 's/.*\.//') -ge $MAX_SCALE ]; then
+            echo "Illegal scale: $item" 1>&2
+            echo "Specify the value less than ${MAX_SCALE}." 1>&2
+            exit 1
+        fi
+
         if [ -n "$DEBUG" ]; then
             {
                 echo "item=$item"
                 echo "scale=$scale"
             } 1>&2
         fi
+
         case $sigil in
             f)
                 num=$(calculate_percent "$FREE_MEM" "$TOTAL_MEM" "$scale") || return 1
