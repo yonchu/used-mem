@@ -8,16 +8,22 @@ $ used-mem
 77.8%(6.2G/8.0G)
 
 $ used-mem '#f%(#FG/#TG)'
-22.2%(1.8G/8.0G)
+22%(2G/8G)
 
+$ used-mem 'Free: #.2f % (#.3F GB) | Used: #.2u % (#.3U GB) | Total: #.3T GB'
+Free: 38.32 % (3.065 GB) | Used: 61.68 % (4.933 GB) | Total: 7.998 GB
 ```
 
 Usage
 -----------------------
 
-```console
+```
 used-mem [Output format]
 ```
+
+Default format:
+
+- ``#.1u%(#.1UG/#.1TG)``
 
 Format string:
 
