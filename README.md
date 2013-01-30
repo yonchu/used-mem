@@ -32,3 +32,9 @@ Format string:
 - ``#F`` : Free memory(GB).
 - ``#U`` : Used memory(GB).
 - ``#T`` : Total memory(GB).
+
+Use on tmux or screen
+-----------------------
+
+![sample01](https://raw.github.com/yonchu/used-mem/master/img/used-mem01.png)
+
