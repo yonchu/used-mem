@@ -7,7 +7,7 @@
 #    77.8%(6.2G/8.0G)
 #
 #    $ used-mem '#f%(#FG/#TG)'
-#    22.2%(1.8G/8.0G)
+#    22%(2G/8G)
 #
 #    $ used-mem 'Free: #.2f % (#.3F GB) | Used: #.2u % (#.3U GB) | Total: #.3T GB'
 #    Free: 38.32 % (3.065 GB) | Used: 61.68 % (4.933 GB) | Total: 7.998 GB
@@ -26,7 +26,7 @@
 #    https://discussionsjapan.apple.com/thread/10093439?start=0&tstart=0
 #    http://support.apple.com/kb/HT1342?viewlocale=ja_JP&locale=ja_JP
 
-DEFAULT_SCALE=${DEFAULT_SCALE:-'.1'}
+DEFAULT_SCALE=${DEFAULT_SCALE:-'.0'}
 MAX_SCALE=${MAX_SCALE:-3}
 
 # To round off.
@@ -34,7 +34,7 @@ MAX_SCALE=$(($MAX_SCALE + 1))
 
 # Set format.
 if [ -z "$1" ]; then
-    FORMAT='#u%(#UG/#TG)'
+    FORMAT='#.1u%(#.1UG/#.1TG)'
 else
     FORMAT=$1
 fi
