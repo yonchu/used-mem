@@ -3,6 +3,19 @@
 # Print memory status.
 #
 #  Usage:
+#    used-mem [Output format]
+#
+#  Default format:
+#    #.1u%(#.1UG/#.1TG)
+#
+#  Format string:
+#    #f : Free memory(%).
+#    #u : Used memory(%).
+#    #F : Free memory(GB).
+#    #U : Used memory(GB).
+#    #T : Total memory(GB).
+#
+#  Example:
 #    $ used-mem
 #    77.8%(6.2G/8.0G)
 #
@@ -11,13 +24,6 @@
 #
 #    $ used-mem 'Free: #.2f % (#.3F GB) | Used: #.2u % (#.3U GB) | Total: #.3T GB'
 #    Free: 38.32 % (3.065 GB) | Used: 61.68 % (4.933 GB) | Total: 7.998 GB
-#
-#  Format string:
-#    #f : Free memory(%).
-#    #u : Used memory(%).
-#    #F : Free memory(GB).
-#    #U : Used memory(GB).
-#    #T : Total memory(GB).
 #
 #  About vm_stat:
 #    Page size: 4096 bytes
@@ -29,8 +35,25 @@
 DEFAULT_SCALE=${DEFAULT_SCALE:-'.0'}
 MAX_SCALE=${MAX_SCALE:-3}
 
+
 # To round off.
 MAX_SCALE=$(($MAX_SCALE + 1))
+
+# This script name.
+PROG=$(basename "$0")
+
+# Usage.
+USAGE=`cat << __EOF__
+Usage:
+  $PROG [Output format]
+Format string:
+  #f : Free memory(%).
+  #u : Used memory(%).
+  #F : Free memory(GB).
+  #U : Used memory(GB).
+  #T : Total memory(GB).
+__EOF__
+`
 
 # Set format.
 if [ -z "$1" ]; then
@@ -43,6 +66,13 @@ fi
 FREE_MEM=
 USED_MEM=
 TOTAL_MEM=
+
+
+# Usage.
+exit_usage() {
+    echo "$USAGE" 1>&2
+    exit 1
+}
 
 round_off() {
     local num=$1
@@ -89,7 +119,7 @@ calculate_memory() {
 
     if type vm_stat > /dev/null 2>&1; then
         local vm_stat
-        vm_stat=$(vm_stat)
+        vm_stat=$(vm_stat) || return 1
         local pages_free=$(echo "$vm_stat" | awk '/Pages free/ {print $3}' | tr -d '.')
         local pages_active=$(echo "$vm_stat" | awk '/Pages active/ {print $3}' | tr -d '.')
         local pages_inactive=$(echo "$vm_stat" | awk '/Pages inactive/ {print $3}' | tr -d '.')
@@ -120,11 +150,12 @@ calculate_memory() {
         fi
     elif type free > /dev/null 2>&1; then
         local free
-        free=$(free)
+        free=$(free) || return 1
         free_mem=$(echo "$free" | awk '/-\/\+ buffers\/cache/ {print $4}')
         used_mem=$(echo "$free" | awk '/-\/\+ buffers\/cache/ {print $3}')
     else
-        return 1
+        echo 'Error: Requires the command free(Linux) or vm_stat(OSX).' 1>&2
+        exit 1
     fi
 
     local total_mem=$(($used_mem + $free_mem))
@@ -171,7 +202,7 @@ set_up_format() {
 
         # Check scale.
         if [ $(echo "$scale" | sed 's/.*\.//') -ge $MAX_SCALE ]; then
-            echo "Illegal scale: $item" 1>&2
+            echo "Error: Illegal scale: $item" 1>&2
             echo "Specify the value less than ${MAX_SCALE}." 1>&2
             exit 1
         fi
@@ -200,8 +231,8 @@ set_up_format() {
                 num=$(convert_kb_to_gb "$TOTAL_MEM" "$scale") || return 1
                 ;;
             *)
-                echo "Illegal sigil: $sigil" 1>&2
-                exit 1
+                echo "Error: Illegal sigil: $sigil" 1>&2
+                return 1
                 ;;
         esac
         item=$(echo "$item" | sed 's/\./\\./')
@@ -241,5 +272,5 @@ main() {
     fi
 }
 
-main
+main || exit_usage
 
