@@ -36,5 +36,17 @@ Format string:
 Use on tmux or screen
 -----------------------
 
+Used memory(%\):
+
 ![sample01](https://raw.github.com/yonchu/used-mem/master/img/used-mem01.png)
+
+
+Used memory(%)(GB) and total memory(GB):
+
+![sample02](https://raw.github.com/yonchu/used-mem/master/img/used-mem02.png)
+
+
+Used memory(%)(GB) and free memory(%)(GB)]:
+
+![sample03](https://raw.github.com/yonchu/used-mem/master/img/used-mem03.png)
 
