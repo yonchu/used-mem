@@ -23,11 +23,20 @@
 #    https://discussionsjapan.apple.com/thread/10093439?start=0&tstart=0
 #    http://support.apple.com/kb/HT1342?viewlocale=ja_JP&locale=ja_JP
 
+DEFAULT_SCALE=${DEFAULT_SCALE:-'.1'}
+
+# Set format.
 if [ -z "$1" ]; then
     FORMAT='#u%(#UG/#TG)'
 else
     FORMAT=$1
 fi
+
+# Cache data.
+FREE_MEM=
+USED_MEM=
+TOTAL_MEM=
+
 
 # Calculate $1/$2(%) to $3 decimal place.
 calculate_percent() {
@@ -100,41 +109,65 @@ calculate_memory() {
         } 1>&2
     fi
 
-    echo "$free_mem" "$used_mem" "$total_mem"
+    # Caching data.
+    FREE_MEM=$free_mem
+    USED_MEM=$used_mem
+    TOTAL_MEM=$total_mem
+}
+
+set_up_format() {
+    local sigil=$1
+    local format=$2
+
+    local -a list
+    list=($(echo "$format" | GREP_OPTIONS= grep -o "#[^#${sigil}]*${sigil}"))
+
+    local item
+    local scale
+    local num
+    for item in "${list[@]}"; do
+        scale=$(echo "$item" | sed 's/^#\(.*\).$/\1/')
+        if [ -z "$scale" ]; then
+            scale=$DEFAULT_SCALE
+        fi
+        case $sigil in
+            f)
+                num=$(calculate_percent "$FREE_MEM" "$TOTAL_MEM" "$scale") || return 1
+                ;;
+            u)
+                num=$(calculate_percent "$USED_MEM" "$TOTAL_MEM" "$scale") || return 1
+                ;;
+            F)
+                num=$(convert_kb_to_gb "$FREE_MEM" "$scale") || return 1
+                ;;
+            U)
+                num=$(convert_kb_to_gb "$USED_MEM" "$scale") || return 1
+                ;;
+            T)
+                num=$(convert_kb_to_gb "$TOTAL_MEM" "$scale") || return 1
+                ;;
+            *)
+                echo "Illegal sigil: $sigil" 1>&2
+                exit 1
+                ;;
+        esac
+        item=$(echo "$item" | sed 's/\./\\./')
+        format=$(echo "$format" | sed "s/$item/$num/g")
+    done
+    echo "$format"
 }
 
 # Main
 main() {
-    local -a mem
-    mem=($(calculate_memory)) || return 1
+    calculate_memory || return 1
 
-    local free_mem=${mem[0]}
-    local used_mem=${mem[1]}
-    local total_mem=${mem[2]}
+    local format=$FORMAT
+    local sigil
+    for sigil in f u F U T; do
+        format=$(set_up_format "$sigil" "$format") || return 1
+    done
 
-    local used_mem_gb=$(convert_kb_to_gb "$used_mem" '.1') || return 1
-    local free_mem_gb=$(convert_kb_to_gb "$free_mem" '.1') || return 1
-    local total_mem_gb=$(convert_kb_to_gb "$total_mem" '.1') || return 1
-
-    local used_mem_percent=$(calculate_percent "$used_mem" "$total_mem" '.1') || return 1
-    local free_mem_percent=$(calculate_percent "$free_mem" "$total_mem" '.1') || return 1
-
-    if [ -n "$DEBUG" ]; then
-        {
-            echo "used_mem_gb: ${used_mem_gb}GB"
-            echo "free_mem_gb: ${free_mem_gb}GB"
-            echo "total_mem_gb: ${total_mem_gb}GB"
-            echo "used_mem_percent: ${used_mem_percent}%"
-            echo "free_mem_percent: ${free_mem_percent}%"
-            echo
-        } 1>&2
-    fi
-    echo "$FORMAT" | sed \
-        -e "s/#u/$used_mem_percent/g" \
-        -e "s/#f/$free_mem_percent/g" \
-        -e "s/#U/$used_mem_gb/g" \
-        -e "s/#F/$free_mem_gb/g" \
-        -e "s/#T/$total_mem_gb/g"
+    echo "$format"
 }
 
 main
