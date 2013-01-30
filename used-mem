@@ -27,6 +27,10 @@
 #    http://support.apple.com/kb/HT1342?viewlocale=ja_JP&locale=ja_JP
 
 DEFAULT_SCALE=${DEFAULT_SCALE:-'.1'}
+MAX_SCALE=${MAX_SCALE:-3}
+
+# To round off.
+MAX_SCALE=$(($MAX_SCALE + 1))
 
 # Set format.
 if [ -z "$1" ]; then
@@ -40,20 +44,42 @@ FREE_MEM=
 USED_MEM=
 TOTAL_MEM=
 
+round_off() {
+    local num=$1
+    local result
+
+    result=$((($num + 5) / 10))
+    result=$(printf "%0${MAX_SCALE}d" $result)
+    echo "$result" | sed -e "s/\(.*\)\([0-9]\{$MAX_SCALE\}\)/\1.\2/" -e 's/^\./0./'
+}
 
 # Calculate $1/$2(%) to $3 decimal place.
 calculate_percent() {
+    local num1=$1
+    local num2=$2
     local scale=$3
-    local num=$(echo "scale=9; $1 / $2" | bc)
-    num=$(echo "$num * 100" | bc)
-    printf "%${3}f" $num
+    local result
+
+    if type bc > /dev/null 2>&1; then
+        result=$(echo "scale=$MAX_SCALE; 100 * $num1 / $num2" | bc)
+    else
+        result=$(round_off $(($num1 * 1000 * 10 ** $MAX_SCALE / $num2)))
+    fi
+    printf "%${scale}f" $result
 }
 
 # Convert $1 KB to GB ($2 decimal place).
 convert_kb_to_gb() {
+    local num=$1
     local scale=$2
-    local num=$(echo "scale=9; $1 / 1024 / 1024" | bc)
-    printf "%${2}f" $num
+    local result
+
+    if type bc > /dev/null 2>&1; then
+        result=$(echo "scale=$MAX_SCALE; $num / 1024 / 1024" | bc)
+    else
+        result=$(round_off $(($num * 10 * 10 ** $MAX_SCALE / 1024 / 1024)))
+    fi
+    printf "%${scale}f" $result
 }
 
 # Calculate used memory(KB) and total memory(KB).
@@ -197,7 +223,7 @@ main() {
 
     if [ -n "$DEBUG" ]; then
         echo '========== ========== ========== =========' 1>&2
-        local debug_format='Free: #.2f % (#.3F GB) | Used: #.2u % (#.3U GB) | Total: #.3T GB'
+        local debug_format='Free: #.3f % (#.3F GB) | Used: #.3u % (#.3U GB) | Total: #.3T GB'
         for sigil in f u F U T; do
             debug_format=$(set_up_format "$sigil" "$debug_format") || return 1
         done
