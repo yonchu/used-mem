@@ -50,3 +50,10 @@ Used memory(%)(GB) and free memory(%)(GB):
 
 ![sample03](https://raw.github.com/yonchu/used-mem/master/img/used-mem03.png)
 
+See also
+-----------------------
+
+Japanese reference:
+
+[メモリ使用率を表示する (Mac/Linux+出力カスタマイズ+精度指定) - よんちゅBlog](http://yonchu.hatenablog.com/entry/2013/02/01/231646)
+
