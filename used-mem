@@ -6,7 +6,7 @@
 #    used-mem [Output format]
 #
 #  Default format:
-#    #.1u%(#.1UG/#.1TG)
+#    #.1u%(#.2UG/#.2TG)
 #
 #  Format string:
 #    #f : Free memory(%).
@@ -17,10 +17,10 @@
 #
 #  Example:
 #    $ used-mem
-#    77.8%(6.2G/8.0G)
+#    77.5%(6.20G/8.00G)
 #
 #    $ used-mem '#f%(#FG/#TG)'
-#    22%(2G/8G)
+#    25%(2G/8G)
 #
 #    $ used-mem 'Free: #.2f % (#.3F GB) | Used: #.2u % (#.3U GB) | Total: #.3T GB'
 #    Free: 38.32 % (3.065 GB) | Used: 61.68 % (4.933 GB) | Total: 7.998 GB
@@ -31,6 +31,8 @@
 #    http://d.hatena.ne.jp/zariganitosh/20110617/free_memory
 #    https://discussionsjapan.apple.com/thread/10093439?start=0&tstart=0
 #    http://support.apple.com/kb/HT1342?viewlocale=ja_JP&locale=ja_JP
+#    http://www.badrit.com/blog/2014/5/1/how-to-calc-memory-usage-in-mavericks-programmatically#.VXKo2lyqpBc
+#    http://www.songmu.jp/riji/entry/2015-05-08-mac-memory.html
 
 DEFAULT_SCALE=${DEFAULT_SCALE:-'.0'}
 MAX_SCALE=${MAX_SCALE:-3}
@@ -57,7 +59,7 @@ __EOF__
 
 # Set format.
 if [ -z "$1" ]; then
-    FORMAT='#.1u%(#.1UG/#.1TG)'
+    FORMAT='#.1u%(#.2UG/#.2TG)'
 else
     FORMAT=$1
 fi
@@ -112,10 +114,16 @@ convert_kb_to_gb() {
     printf "%${scale}f" $result
 }
 
+# Conert $1 pages to KB.
+convert_pages_to_kb() {
+    echo "$(($1 * 4096 / 1024))"
+}
+
 # Calculate used memory(KB) and total memory(KB).
 calculate_memory() {
     local free_mem
     local used_mem
+    local total_mem
 
     if type vm_stat > /dev/null 2>&1; then
         local vm_stat
@@ -125,11 +133,28 @@ calculate_memory() {
         local pages_inactive=$(echo "$vm_stat" | awk '/Pages inactive/ {print $3}' | tr -d '.')
         local pages_speculative=$(echo "$vm_stat" | awk '/Pages speculative/ {print $3}' | tr -d '.')
         local pages_wired=$(echo "$vm_stat" | awk '/Pages wired down/ {print $4}' | tr -d '.')
+        local pages_compressed=$(echo "$vm_stat" | awk '/Pages stored in compressor/ {print $5}' | tr -d '.')
+        local pages_purgeable=$(echo "$vm_stat" | awk '/Pages purgeable/ {print $3}' | tr -d '.')
+        local pages_file=$(echo "$vm_stat" | awk '/File-backed pages/ {print $3}' | tr -d '.')
+        local pages_app=$(echo "$vm_stat" | awk '/Anonymous pages/ {print $3}' | tr -d '.')
 
-        local free_mem=$((($pages_free + $pages_speculative) * 4096 / 1024))
-        local used_mem=$((($pages_active + $pages_inactive + $pages_wired) * 4096 / 1024))
-        # Actual memory excluded inactive one.
-        #local used_mem=$(($pages_active + $pages_wired))
+        local used_and_cached_mem=$(($pages_active + $pages_inactive + $pages_speculative + $pages_wired + $pages_compressed))
+        local cached_mem=$(($pages_purgeable + $pages_file))
+
+        if type sysctl > /dev/null 2>&1; then
+            total_mem=$(sysctl -n 'hw.memsize')
+            total_mem=$(($total_mem / 4096))
+        else
+            total_mem=$(($used_and_cached_mem + $pages_free))
+        fi
+        used_mem=$(($used_and_cached_mem - $cached_mem))
+        free_mem=$(($total_mem - $used_mem))
+
+        used_and_cached_mem=$(convert_pages_to_kb $used_and_cached_mem)
+        cached_mem=$(convert_pages_to_kb $cached_mem)
+        used_mem=$(convert_pages_to_kb $used_mem)
+        free_mem=$(convert_pages_to_kb $free_mem)
+        total_mem=$(convert_pages_to_kb $total_mem)
 
         if [ -n "$DEBUG" ]; then
             {
@@ -139,12 +164,26 @@ calculate_memory() {
                 echo "pages_inactive: $pages_Inactive pages"
                 echo "pages_speculative: $pages_speculative pages"
                 echo "pages_wired: $pages_wired pages"
+                echo "pages_compressed: $pages_compressed pages"
+                echo "pages_purgeable: $pages_purgeable pages"
+                echo "pages_file: $pages_file pages"
+                echo "pages_app: $pages_app pages"
                 echo
-                echo "pages_free: $(($pages_free * 4096 / 1024)) KB"
-                echo "pages_active: $(($pages_active * 4096 / 1024)) KB"
-                echo "pages_inactive: $(($pages_inactive * 4096 / 1024)) KB"
-                echo "pages_speculative: $(($pages_speculative * 4096 / 1024)) KB"
-                echo "pages_wired: $(($pages_wired * 4096 / 1024)) KB"
+                echo "pages_free: $(convert_pages_to_kb $pages_free) KB"
+                echo "pages_active: $(convert_pages_to_kb $pages_active) KB"
+                echo "pages_inactive: $(convert_pages_to_kb $pages_inactive) KB"
+                echo "pages_speculative: $(convert_pages_to_kb $pages_speculative) KB"
+                echo "pages_wired: $(convert_pages_to_kb $pages_wired) KB"
+                echo "pages_compressed: $(convert_pages_to_kb $pages_compressed) KB"
+                echo "pages_purgeable: $(convert_pages_to_kb $pages_purgeable) KB"
+                echo "pages_file: $(convert_pages_to_kb $pages_file) KB"
+                echo "pages_app: $(convert_pages_to_kb $pages_app) KB"
+                echo
+                echo "used_and_cached_mem: $used_and_cached_mem KB"
+                echo "cached_mem: $cached_mem KB"
+                echo "free_mem: $free_mem KB"
+                echo "used_mem: $used_mem KB"
+                echo "total_mem: $total_mem KB"
                 echo
             } 1>&2
         fi
@@ -153,12 +192,11 @@ calculate_memory() {
         free=$(free) || return 1
         free_mem=$(echo "$free" | awk '/-\/\+ buffers\/cache/ {print $4}')
         used_mem=$(echo "$free" | awk '/-\/\+ buffers\/cache/ {print $3}')
+        total_mem=$(($used_mem + $free_mem))
     else
         echo 'Error: Requires the command free(Linux) or vm_stat(OSX).' 1>&2
         exit 1
     fi
-
-    local total_mem=$(($used_mem + $free_mem))
 
     if [ -n "$DEBUG" ]; then
         {
@@ -266,6 +304,7 @@ main() {
         local debug_format='Free: #.3f % (#.3F GB) | Used: #.3u % (#.3U GB) | Total: #.3T GB'
         for sigil in f u F U T; do
             debug_format=$(set_up_format "$sigil" "$debug_format") || return 1
+            echo
         done
         echo "$debug_format" 1>&2
         echo '========== ========== ========== =========' 1>&2
