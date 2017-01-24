@@ -133,7 +133,7 @@ calculate_memory() {
         local pages_inactive=$(echo "$vm_stat" | awk '/Pages inactive/ {print $3}' | tr -d '.')
         local pages_speculative=$(echo "$vm_stat" | awk '/Pages speculative/ {print $3}' | tr -d '.')
         local pages_wired=$(echo "$vm_stat" | awk '/Pages wired down/ {print $4}' | tr -d '.')
-        local pages_compressed=$(echo "$vm_stat" | awk '/Pages stored in compressor/ {print $5}' | tr -d '.')
+        local pages_compressed=$(echo "$vm_stat" | awk '/Pages occupied by compressor/ {print $5}' | tr -d '.')
         local pages_purgeable=$(echo "$vm_stat" | awk '/Pages purgeable/ {print $3}' | tr -d '.')
         local pages_file=$(echo "$vm_stat" | awk '/File-backed pages/ {print $3}' | tr -d '.')
         local pages_app=$(echo "$vm_stat" | awk '/Anonymous pages/ {print $3}' | tr -d '.')
